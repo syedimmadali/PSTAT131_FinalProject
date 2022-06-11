@@ -1,0 +1,66 @@
+---
+title: "PSTAT131_FinalProject Code Book"
+author: "Immad Ali"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Summary
+
+League of legends is a fast paced, multiplier online battle arena styled game in which two teams of five fight against each other and destroy the enemies base. At the heart of each team is the Nexus. Destroying the enemies Nexus results in you winning the game. The map, known as Summoner's Rift, consists of a roughly square map with each team in a corner. The map is perfectly symmetrical and consists of three lanes: top, middle, and bottom. There is also a jungle space between each lane. Players also level up their champions by gaining experience. Experience is gained by killing minions, killing enemies, or other neutral enemies on the map. In order to win the game, you're team must progress against the enemy's turrets, which defend the enemy nexus. The team that successful defeats the other teams Nexus, wins. 
+
+```{r}
+library(vembedr)
+embed_youtube("BGtROJeMPeE")
+```
+
+
+# Data Set Code Book
+  - Response variable: 
+    - ‘blueWins’: this is the result on whether blue team won (indicated by "1") or blue team lost (indicated by "0")
+  - Total predictor variables: 38
+    - Numeric predictors: 30
+    - Binary  predictors: 8
+  - Predictors:
+    - blueWardsPlaced: Number of warding totems placed by the blue team                         
+    - blueWardsDestroyed: Number of enemy warding totems the blue team destroyed                    
+    - blueFirstBlood: First kill of the game. ("1" for Blue team, "0" for Red team)
+    - blueKills: Number of enemies killed by the blue team
+    - blueDeaths: Number of blue deaths 
+    - blueAssists: Number of kill assists (blue team)
+    - blueEliteMonster: Number of elite monsters killed by the blue team (Drags, Herald, Baron) 
+    - blueDragons: Number of dragons killed by the blue team
+    - blueHeralds: Number of heralds killed by the blue team
+    - blueTowersDestroyed: Number of structures destroyed by the blue team
+    - blueTotalGold: Blue team total gold
+    - blueAvgLevel: blue team average champion level
+    - blueTotalExperience: Blue team total experience
+    - blueTotalMinionsKilled: blue team total minions killed
+    - blueTotalJungleMinionsKilled: Blue team total jungle monsters killed                                        
+    - blueGoldDiff: blue team gold difference compared to the enemy team
+    - blueExperienceDiff: Blue team experience difference compared to the red team
+    - blueCSPerMin: blue team minions per minute
+    - blueGoldPerMin: blue team gold per minute
+    - redWardsPlaced: Number of warding totems placed by the red team on the map
+    - redWardsDestroyed: Number of enemy warding totems the red team has destroyed
+    - redFirstBlood: First kill of the game. (Refer back to blueFirstBlood)
+    - redKills: Number of enemies killed by the red team
+    - redDeaths: Number of deaths (red team)
+    - redAssists: Number of kill assists (red team)
+    - redEliteMonster: Number of elite monsters killed by the red team (Drags, Herald, Baron)                
+    - redDragons: Number of dragons killed by the red team
+    - redHeralds: Number of heralds killed by the red team
+    - redTowersDestroyed: Number of structures destroyed by the red team
+    - redTotalGold: red team total gold
+    - redAvgLevel: red team average champion level
+    - redTotalExperience: red team total experience
+    - redTotalMinionsKilled: red team total minions killed
+    - redTotalJungleMinionsKilled: red team total jungle monsters killed                                       
+    - redGoldDiff: red team gold difference compared to the enemy team
+    - redExperienceDiff: red team experience difference compared to the blue team
+    - redCSPerMin: red team minions per minute
+    - redGoldPerMin: red team gold per minute
+    
