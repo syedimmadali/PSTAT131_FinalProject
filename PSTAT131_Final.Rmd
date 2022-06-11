@@ -1,0 +1,347 @@
+---
+title: "PSTAT131_FinalProject"
+author: "Immad Ali"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_collapsed: yes
+    code_folding: hide
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+library(randomForest)
+library(ISLR)
+library(tree)
+library(class)
+library(corrplot)
+library(tidymodels)
+library(ggplot2)
+library(corrr)
+library(klaR)
+library(glmnet)
+library(MASS)
+library(discrim)
+library(poissonreg)
+tidymodels_prefer()
+library(ranger)
+library(ggcorrplot)
+library(caret)
+library(ROCR)
+```
+
+# Introduction
+ 
+## What is League of Legends?
+
+League of Legends (LoL) is a fast paced, multiplier online battle arena styled game in which two teams of five fight against each other and destroy the enemies base. At the heart of each team is the Nexus. Destroying the enemies Nexus results in you winning the game. The map, known as Summoner's Rift, consists of a roughly square map with each team in a corner. The map is perfectly symmetrical and consists of three lanes: top, middle, and bottom. There is also a jungle space between each lane. Players also level up their champions by gaining experience. Experience is gained by killing minions, killing enemies, or other neutral enemies on the map. In order to win the game, you're team must progress against the enemy's turrets, which defend the enemy nexus. The team that successful defeats the other teams Nexus, wins. 
+
+```{r}
+library(vembedr)
+embed_youtube("BGtROJeMPeE")
+```
+
+
+
+## Data Source
+
+The data I am using is from the first 10 minutes of a LoL Ranked game in the Diamond Rank. I found the data set posted on Kaggle by the user Michel's Fanboi (who now goes by Yi Lan Ma).
+https://www.kaggle.com/datasets/bobbyscience/league-of-legends-diamond-ranked-games-10-min
+
+# Data Overview
+
+## Processing the Data
+
+* In this step, I will go ahead and read the CSV file in and check the first 6 rows of the data set. 
+```{r}
+data <- read.csv("high_diamond_ranked_10min.csv")
+head(data)
+```
+
+* As we can see, the data has 9,879 observations and has 40 columns. One of those columns is the gameID, which is not helpful to our model. We will go ahead and remove that column from the data set. We will also go ahead and check for any missing values. 
+
+```{r}
+# I go ahead and select the Columns of data from 2 to 40, thus excluding the gameID.
+data <- data[, 2:40]
+
+# Check if there is any missing data.
+colSums(is.na(data))
+```
+
+* There is no missing data in our dataset. I had also addressed the issue of missing data in my data memo. Since the original data set had the gameID, I could go back and manually fill in the missing data, as long as it wasn't to many.
+
+
+* I was curious about some statistics for the predictors. I went ahead and used the summary function to look at the overall statistics of each predictor. 
+```{r}
+summary(data)
+```
+
+
+
+# Exploratory Data Analysis
+
+## Win Loss Bar graph
+
+* I decided to do a simple bar graph just to explore how the blue team was split in terms of wins versus losses. 
+```{r}
+#Makes the data set into a dataframe.
+data_temp <- as.data.frame(table(data$blueWins))
+#Names the X and Y Axis
+colnames(data_temp) <- c("Target", "Frequency")
+#I use this line of code to specify that I am targeting the blue wins columm.
+data_temp$Target <- as.character(data_temp$Target)
+# And then I target the code if the datapoint is a 0 or 1.
+data_temp$Target[data_temp$Target == "0"] <- "Blue Losses"
+data_temp$Target[data_temp$Target == "1"] <- "Blue Wins"
+
+# ggplot of Blue Wins vs Blue Loses
+ggplot(data = data_temp,
+       mapping = aes(x = Target, 
+                     y = Frequency, 
+                     fill = Target)) +
+  geom_bar(stat="identity", position = "dodge") +
+  geom_text(aes(label = round(Frequency, 2)),
+  position = position_stack(vjust = 0.5)) +
+  labs(title = "Blue Wins vs Blue Loses")
+```
+
+* As we can see from the bar graph above, the data seems to be split 50/50 in terms of how many games the blue team won and how many they lost. We will need to dig more in depth if we want to find out what predictors have the biggest impact on blue team winning the game.
+
+## Boxplot Red Minions Killed versus Blue Minions Killed
+
+* To get a deeper look into the initial data set, I used a box plot to show the overall distribution of the red team and blue team minons killed. 
+* I wanted to get a deeper look into this because the main source of gold in this game comes from the minions killed. Therefore, we would be able to see correlations in terms how many minions were killed to the teams respective over all gold.
+
+```{r}
+par(mfrow=c(1,2))
+# Makes a box plot of red minions killed
+boxplot(data$redTotalMinionsKilled, 
+        main = "Box plot for Red Minions Killed", 
+        col = "red")
+
+# Makes a Box plot of blue minions killed
+boxplot(data$blueTotalMinionsKilled, 
+        main = "Box plot for Blue Minions Killed", 
+        col = "steel blue")
+```
+
+* From the two boxplots, we can see that the blue team had significantly more minions killed in each quartile. Therefore, we can say that the blue team had overall more minions killed. 
+
+
+## Correlation Map of Blue Team Predictors
+
+* I decided to make a blue team predictors correlation map to better visualize what certain predictors helped the blue team win.
+```{r, include=FALSE}
+# This line of code only selects the blue team predictors. I could have used the select function, however I was running into weird issues.
+ranked_corr <- data[, c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 ,15 ,16, 17, 18)]
+
+# Makes the correlation map
+res <- cor(ranked_corr)
+round(res, 2)
+```
+
+```{r}
+# Stores the correlation map after being rounded.
+M <- cor(res)
+
+# Prints the correlation map
+corrplot(M, method = "color", number.cex=0.75)
+```
+
+* As shown from the correlation map, there was a large correlation between total minions killed and total gold for the blue team, which confirms our findings from the boxplots. In addition to that, I found that total gold for blue team was heavily correlated to the number of blue team kills. We will explore that in our next EDA. I also wanted to point out vertain predictors that were NOT correlated. I found that the total blue team experience had a negative correlation to the number of blue team deaths. This was actually surprising to me as I thought the two would be very correlated.
+
+
+## Histogram of Blue Wins vs Losses including Number of Kills
+
+* As I mentioned above, I wanted to look a bit more indepth in the total gold for blue team and the total kills for blue team. 
+```{r}
+options(scipen=10000)
+#Total kills effect on wins
+ggplot(data, aes(x = blueKills, fill = factor(blueWins))) +
+  stat_count(width = 0.5) + 
+  xlab("Number of Blue Kills") +
+  ylab("Total Count") + 
+  labs(fill = "Blue Wins")
+```
+
+* Looking at our histogram, we can see that as the number of kills blue team acquired, the more likely they were to win the game. 
+
+
+# Splitting Data and Cross Fold Validation
+
+* In this step, I go ahead and split the original data set into a training and test set. I went ahead and chose a 70-30 split of the data. I also checked the dimensions of the test and training set to insure the they added up to the total observations.
+
+```{r}
+set.seed(123)
+data$blueWins <- as.factor(data$blueWins)
+split1<- sample(c(rep(0, 0.7 * nrow(data)), rep(1, 0.3 * nrow(data))))
+train <- data[split1 == 0, ] 
+test <- data[split1== 1, ]
+dim(train)
+dim(test)
+```
+ 
+ * In the training set, there are 6916 observations and in the testing set, there are 2963 observations.
+ 
+# Fitting the Models
+
+## Logisitc Model
+
+* Here I go ahead and fit the logistics regression model to our data. I also cross-validate the data.
+```{r}
+# Cross validating the data with 5 folds.
+control <- trainControl(method = "cv", 
+                        number = 5)
+
+# Here I go ahead and train the model to use the GLM engine.
+kfold_model_glm <- train(blueWins ~., 
+                     data = train, 
+                     trControl = control, 
+                     method = "glm")
+
+# Printing out the Logistic Regression model Results.
+print(kfold_model_glm)
+```
+
+* As we can see from the results, I got an accuracy rate of 73.2%. I was also getting a weird error as shown above. Unfortunately, I was unable to resolve this error after checking online and with data scientist friends.
+
+## Random Forest Model
+```{r}
+# Cross validating the data with 5 folds.
+control <- trainControl(method = "cv", number = 5)
+
+# Tuning model based on metric, mtry
+metric <- "Accuracy"
+# I set mtry to 38, because we have 38 predictors
+mtry <- 38
+tunegrid <- expand.grid(.mtry=mtry)
+
+# Fit the Random Forest model to the data.
+rf_default <- train(blueWins~., data=train, method="rf", metric=metric, tuneGrid=tunegrid, trControl=control)
+
+#prints out the RF model results.
+print(rf_default)
+```
+
+* As you can see, we got an accuracy rating of 71.64% for the Random Forest Model.
+
+## Boosting Model
+
+```{r, include =FALSE}
+# Cross validating the data with 5 folds.
+control <- trainControl(method = "cv", 
+                        number = 5)
+
+# Fitting the Boosting model to the data set.
+kfold_model_boosting <- train(blueWins ~., 
+                     data = train, 
+                     trControl = control, 
+                     method = "gbm")
+```
+
+```{r}
+# Prints out the boosting model results.
+print(kfold_model_boosting)
+```
+
+* From the results above, it seems that the accuracy rate was between 72.2% and 72.9%
+
+
+
+## K Nearest Neighbour Model
+
+```{r}
+# Cross validating the data with 5 folds.
+control <- trainControl(method = "cv", 
+                        number = 5)
+
+# Fitting the K Neearest Neighbour model to the data set.
+kfold_model_knn <- train(blueWins ~., 
+                     data = train, 
+                     trControl = control, 
+                     method = "knn")
+
+# Prints out the K Nearest Neighbor Model results
+print(kfold_model_knn)
+```
+
+* From the results above, I got the highest accuracy rate at k = 9, at 71% I got the lowest accuracy rate at k = 5, at 69.12%
+
+
+# Overall Performance of Models
+
+* I will now go ahead and check the overall performance of my models and determine which of the models best fits my data.
+
+## Linear Regression Model Evaluation
+```{r}
+pred <- predict(kfold_model_glm, newdata = test)
+cm <- table(pred, test$blueWins)
+
+#Confusion matrix for my prediction.
+confusionMatrix(cm)
+```
+
+* After fitting the logistic model to our testing data set, I computed the confusion matrix. From the prediction model, we can see that the Linear Regression model had an accuracy of 72.93%. 
+
+
+
+## Random Forest Model Evaluation
+
+```{r}
+pred <- predict(rf_default, newdata = test)
+cm <- table(pred, test$blueWins)
+confusionMatrix(cm)
+```
+
+* After fitting the Random Forest Model to the testing set, I computed the confusion matrix. As we can see, we got an accuracy rate of 72.2%. This model performed slightly worse than our logistic regression model.
+
+
+## Boosting Model Evaluation
+
+```{r}
+pred <- predict(kfold_model_boosting, newdata = test)
+cm <- table(pred, test$blueWins)
+confusionMatrix(cm)
+```
+
+* After fitting the Boosting Model to the testing set, I computed the confusion matrix. The boosting model gave us an accuracy rate of 73.17%, which was the highest amonghts the models. 
+
+
+
+## K-Nearest Neighbour Model Evalution
+
+```{r}
+pred <- predict(kfold_model_knn, newdata = test)
+cm <- table(pred, test$blueWins)
+confusionMatrix(cm)
+```
+
+* Finally, for our last model, we fit the KNN model to our testing set and got an accuracy rate of 70.27%. This model performed the worst relative to our other models. 
+
+
+# Conclusion
+
+To recap what I learned from this data analysis project. I first went ahead and did exploratory data analysis on the overall data set. In my EDA, I found there are several key predictors that are highly correlated. I was also able to learn through my correlation map, that two predictors I thought would be correlated, were actually not. I also looked at the overall games won by blue team factoring in the total kills the team collected. \
+
+I then went ahead and chose four machine learning models, Logistic Regression, Random Forest, Boosting, and K-Nearest Neighbour, and used some tuning to look at their models. I then used cross-validation to test those four models and determine the overall accuracy of the model. Based on the accuracy rate of the logistic model, I can say that the that it had the best prediction effects on the testing set. I would also give the boosted model a honorary award for having the second highest accuracy rate among the other models. \
+
+
+I then went ahead and fit the models to our test set to determine the best performing model. I found that the boosting model ended up having the highest accuracy relative to the other models. In the end, I would say we could definitely predict the game results of the blue team winning or losing based on the data set using our machine learning model. \
+
+I would like to add a final note on how I could possibly improve this project. For one, I could get a larger data set to test and train our models. I think the biggest way I could help improve this project is to add more tuning to each model. In addition, adding some more EDA looking at other key predictors would be beneficial as well!
+
+
+
+
+
+
+
+
+
+
+
